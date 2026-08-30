@@ -1,7 +1,7 @@
 # name: discourse-posted-group
 # about: Automatically adds users to the "posted" group once they've made at least one post or reply
 # version: 1.3
-# authors: jronieleky
+# authors: jronielky
 
 after_initialize do
   group_1_name = "posted"
