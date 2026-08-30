@@ -1,7 +1,7 @@
 # name: discourse-posted-group
 # about: Automatically adds users to the "posted" group once they've made at least one post or reply
-# version: 1.1
-# authors: you
+# version: 1.2
+# authors: jronieleky
 
 after_initialize do
   # Moved inside the block to prevent polluting the global Ruby namespace
