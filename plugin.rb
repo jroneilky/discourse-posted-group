@@ -1,4 +1,4 @@
-# name: add-to-posted-group
+# name: discourse-posted-group
 # about: Automatically adds users to the "posted" group once they've made at least one post or reply
 # version: 1.1
 # authors: you
