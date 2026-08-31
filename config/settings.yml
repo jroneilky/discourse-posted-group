@@ -1,4 +1,10 @@
+# config/settings.yml
 plugins:
-  discourse_posted_group_enabled:
-    default: true
+  posted_group_enabled:
+    default: false
     client: false
+  # pipe-separated "threshold:group_name" pairs, e.g. 1:posted|10:posted_10|25:posted_25
+  posted_group_thresholds:
+    default: "1:posted|10:posted_10"
+    client: false
+    type: string
