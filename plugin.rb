@@ -2,11 +2,10 @@
 
 # name: discourse_posted_group
 # about: Automatically adds users to groups based on their public post count.
-# version: 1.0.0
+# version: 1.1
 # authors: jroneilky
-# contact email:
+# contact_emails:
 # url: https://github.com/jroneilky/discourse_posted_group
-# license: MIT
 
 enabled_site_setting :discourse_posted_group_enabled
 
@@ -17,30 +16,56 @@ after_initialize do
 
     class << self
       def update_groups(user)
-        return if user.blank?
-        return if user.bot?
-        return if user.staged?
+        return if user.blank? || user.bot? || user.staged?
 
-        add_to_group(user, GROUP_POSTED)    { public_posts_scope(user).limit(1).exists? }
-        add_to_group(user, GROUP_POSTED_10) { public_posts_scope(user).offset(9).limit(1).exists? }
+        count = public_posts_count(user)
+        add_to_group(user, GROUP_POSTED, count >= 1)
+        add_to_group(user, GROUP_POSTED_10, count >= 10)
       end
 
-      private
+      def handle_post_event(post)
+        return unless SiteSetting.discourse_posted_group_enabled
+        return if post.blank? || post.topic.blank? || post.user.blank?
 
-      def add_to_group(user, group_name)
-        group = ensure_group(group_name)
-        return if group.blank?
-        return if group_member?(group, user)
+        user = post.user
+        return if user.bot? || user.staged?
+        return if post.topic.private_message?
+        return unless post.post_type == Post.types[:regular]
 
-        return unless yield
-
-        group.add(user)
+        update_groups(user)
       rescue StandardError => e
-        Rails.logger.error("discourse_posted_group: failed to add user #{user.id} to '#{group_name}': #{e.message}")
+        Rails.logger.error("discourse_posted_group: post handler failed for post #{post&.id}: #{e.message}")
       end
 
       def ensure_group(name)
         Group.find_by(name: name) || create_group(name)
+      end
+
+      def public_post_user_ids
+        Post.joins(:topic)
+            .where(deleted_at: nil)
+            .where(post_type: Post.types[:regular])
+            .where.not(topics: { archetype: Archetype.private_message })
+            .where(topics: { deleted_at: nil })
+            .distinct
+            .pluck(:user_id)
+      end
+
+      private
+
+      def add_to_group(user, group_name, should_add)
+        group = ensure_group(group_name)
+        return if group.blank?
+
+        is_member = group_member?(group, user)
+
+        if should_add && !is_member
+          group.add(user)
+        elsif !should_add && is_member
+          group.remove(user)
+        end
+      rescue StandardError => e
+        Rails.logger.error("discourse_posted_group: failed to update membership for user #{user.id} in '#{group_name}': #{e.message}")
       end
 
       def create_group(name)
@@ -48,9 +73,13 @@ after_initialize do
           name: name,
           full_name: name.titleize,
           visibility_level: Group.visibility_levels[:members],
+          members_visibility_level: Group.visibility_levels[:members],
           automatic: false
         )
-      rescue StandardError => e
+      rescue ActiveRecord::RecordNotUnique => e
+        Rails.logger.warn("discourse_posted_group: race creating group '#{name}': #{e.message}")
+        Group.find_by(name: name)
+      rescue ActiveRecord::RecordInvalid => e
         Rails.logger.error("discourse_posted_group: failed to create group '#{name}': #{e.message}")
         nil
       end
@@ -59,30 +88,23 @@ after_initialize do
         GroupUser.exists?(group_id: group.id, user_id: user.id)
       end
 
+      def public_posts_count(user)
+        public_posts_scope(user).count
+      end
+
       def public_posts_scope(user)
         Post.joins(:topic)
             .where(user_id: user.id, deleted_at: nil)
             .where(post_type: Post.types[:regular])
             .where.not(topics: { archetype: Archetype.private_message })
+            .where(topics: { deleted_at: nil })
       end
     end
   end
 
-  on(:post_created) do |post, opts|
-    next unless SiteSetting.discourse_posted_group_enabled
-    next if post.blank?
-    next if post.user.blank?
-
-    user = post.user
-    next if user.bot?
-    next if user.staged?
-    next if post.topic&.private_message?
-    next if post.whisper?
-
-    DiscoursePostedGroup.update_groups(user)
-  rescue StandardError => e
-    Rails.logger.error("discourse_posted_group: post_created handler failed for post #{post&.id}: #{e.message}")
-  end
+  on(:post_created)   { |post, opts| ::DiscoursePostedGroup.handle_post_event(post) }
+  on(:post_destroyed) { |post, opts| ::DiscoursePostedGroup.handle_post_event(post) }
+  on(:post_recovered) { |post, opts| ::DiscoursePostedGroup.handle_post_event(post) }
 
   if SiteSetting.discourse_posted_group_enabled
     DistributedMutex.synchronize("discourse_posted_group_backfill", validity: 60) do
@@ -99,11 +121,15 @@ module ::Jobs
     def execute(args = {})
       return unless SiteSetting.discourse_posted_group_enabled
 
-      User.real.not_staged
-          .joins(:user_stat)
-          .where("user_stats.post_count > 0")
-          .find_each do |user|
-        DiscoursePostedGroup.update_groups(user)
+      group_posted = ::DiscoursePostedGroup.ensure_group(::DiscoursePostedGroup::GROUP_POSTED)
+      group_posted_10 = ::DiscoursePostedGroup.ensure_group(::DiscoursePostedGroup::GROUP_POSTED_10)
+      return if group_posted.blank? || group_posted_10.blank?
+
+      candidate_ids = ::DiscoursePostedGroup.public_post_user_ids
+      member_ids = GroupUser.where(group_id: [group_posted.id, group_posted_10.id]).distinct.pluck(:user_id)
+
+      User.real.not_staged.where(id: (candidate_ids + member_ids).uniq).find_each do |user|
+        ::DiscoursePostedGroup.update_groups(user)
       end
     rescue StandardError => e
       Rails.logger.error("discourse_posted_group: backfill failed: #{e.message}")
