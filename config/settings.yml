@@ -1,0 +1,116 @@
+plugins:
+  posted_group_enabled:
+    default: true
+    client: false
+    type: bool
+    description: "Enable automatic group assignment based on qualifying posts."
+
+  posted_group_count_private_messages:
+    default: false
+    client: false
+    type: bool
+    description: "Count posts in private-message topics."
+
+  posted_group_count_deleted_posts:
+    default: false
+    client: false
+    type: bool
+    description: "Count deleted posts."
+
+  posted_group_count_hidden_posts:
+    default: false
+    client: false
+    type: bool
+    description: "Count hidden posts."
+
+  posted_group_reconciliation_enabled:
+    default: true
+    client: false
+    type: bool
+    description: "Periodically repair missed or delayed group assignments."
+
+  posted_group_reconciliation_interval_hours:
+    default: 24
+    client: false
+    type: integer
+    min: 1
+    max: 168
+    description: "Minimum hours between reconciliation runs."
+
+  posted_group_reconciliation_batch_size:
+    default: 500
+    client: false
+    type: integer
+    min: 50
+    max: 5000
+    description: "Maximum users processed in one reconciliation batch."
+
+  posted_group_1_name:
+    default: "posted"
+    client: false
+    type: string
+    description: "Group awarded at threshold 1."
+
+  posted_group_1_threshold:
+    default: 1
+    client: false
+    type: integer
+    min: 1
+    max: 100000000
+    description: "Qualifying post count required for group 1."
+
+  posted_group_2_name:
+    default: "posted_10"
+    client: false
+    type: string
+    description: "Group awarded at threshold 2."
+
+  posted_group_2_threshold:
+    default: 10
+    client: false
+    type: integer
+    min: 1
+    max: 100000000
+    description: "Qualifying post count required for group 2."
+
+  posted_group_3_name:
+    default: ""
+    client: false
+    type: string
+    description: "Optional group awarded at threshold 3."
+
+  posted_group_3_threshold:
+    default: 50
+    client: false
+    type: integer
+    min: 1
+    max: 100000000
+    description: "Qualifying post count required for group 3."
+
+  posted_group_4_name:
+    default: ""
+    client: false
+    type: string
+    description: "Optional group awarded at threshold 4."
+
+  posted_group_4_threshold:
+    default: 100
+    client: false
+    type: integer
+    min: 1
+    max: 100000000
+    description: "Qualifying post count required for group 4."
+
+  posted_group_5_name:
+    default: ""
+    client: false
+    type: string
+    description: "Optional group awarded at threshold 5."
+
+  posted_group_5_threshold:
+    default: 250
+    client: false
+    type: integer
+    min: 1
+    max: 100000000
+    description: "Qualifying post count required for group 5."
