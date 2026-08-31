@@ -160,7 +160,7 @@ after_initialize do
       Rails.logger.warn("[posted_group] recover handling failed for post #{post_id}: #{e.message}")
     end
   end
-
+  require_dependency "jobs/base" 
   module ::Jobs
     class PostedGroupPostCreated < ::Jobs::Base
       def execute(args)
